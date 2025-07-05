@@ -1,0 +1,144 @@
+version: '3.8'
+
+services:
+  # PostgreSQL Database with PostGIS
+  postgres:
+    image: postgis/postgis:15-3.3
+    container_name: memory_lane_postgres
+    environment:
+      POSTGRES_DB: memory_lane_db
+      POSTGRES_USER: memory_lane_user
+      POSTGRES_PASSWORD: memory_lane_password
+      POSTGRES_HOST_AUTH_METHOD: trust
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U memory_lane_user -d memory_lane_db"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+    networks:
+      - memory_lane_network
+
+  # Redis for caching and Celery
+  redis:
+    image: redis:7-alpine
+    container_name: memory_lane_redis
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis_data:/data
+    command: redis-server --appendonly yes
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+    networks:
+      - memory_lane_network
+
+  # Flask Web Application
+  web:
+    build: .
+    container_name: memory_lane_web
+    ports:
+      - "5001:5000"
+    environment:
+      - FLASK_ENV=development
+      - DATABASE_URL=postgresql://memory_lane_user:memory_lane_password@postgres:5432/memory_lane_db
+      - REDIS_URL=redis://redis:6379/0
+      - CELERY_BROKER_URL=redis://redis:6379/0
+      - CELERY_RESULT_BACKEND=redis://redis:6379/0
+      - JWT_SECRET_KEY=development-jwt-secret-key
+      - SECRET_KEY=development-flask-secret-key
+    volumes:
+      - .:/app
+      - uploads_data:/app/uploads
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    command: python run.py
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:5000/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+    networks:
+      - memory_lane_network
+
+  # Celery Worker
+  celery_worker:
+    build: .
+    container_name: memory_lane_celery_worker
+    environment:
+      - FLASK_ENV=development
+      - DATABASE_URL=postgresql://memory_lane_user:memory_lane_password@postgres:5432/memory_lane_db
+      - REDIS_URL=redis://redis:6379/0
+      - CELERY_BROKER_URL=redis://redis:6379/0
+      - CELERY_RESULT_BACKEND=redis://redis:6379/0
+    volumes:
+      - .:/app
+      - uploads_data:/app/uploads
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    command: celery -A celery_worker.celery worker --loglevel=info
+    networks:
+      - memory_lane_network
+
+  # Celery Beat (for periodic tasks)
+  celery_beat:
+    build: .
+    container_name: memory_lane_celery_beat
+    environment:
+      - FLASK_ENV=development
+      - DATABASE_URL=postgresql://memory_lane_user:memory_lane_password@postgres:5432/memory_lane_db
+      - REDIS_URL=redis://redis:6379/0
+      - CELERY_BROKER_URL=redis://redis:6379/0
+      - CELERY_RESULT_BACKEND=redis://redis:6379/0
+    volumes:
+      - .:/app
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    command: celery -A celery_worker.celery beat --loglevel=info
+    networks:
+      - memory_lane_network
+
+  # Nginx (for production)
+  nginx:
+    image: nginx:alpine
+    container_name: memory_lane_nginx
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      - ./nginx.conf:/etc/nginx/nginx.conf
+      - ./ssl:/etc/nginx/ssl
+      - uploads_data:/var/www/uploads
+    depends_on:
+      - web
+    networks:
+      - memory_lane_network
+    profiles:
+      - production
+
+volumes:
+  postgres_data:
+    driver: local
+  redis_data:
+    driver: local
+  uploads_data:
+    driver: local
+
+networks:
+  memory_lane_network:
+    driver: bridge 
