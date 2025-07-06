@@ -10,11 +10,12 @@ source venv/bin/activate
 export DATABASE_URL="postgresql://postgres:Robherto82@localhost:5432/memory_lane_db"
 export FLASK_ENV=development
 export FLASK_APP=run.py
+export PORT=5001
 
 # Start the application
 echo "✅ Database: memory_lane_db"
 echo "✅ Environment: development"
-echo "✅ Starting server on http://localhost:5000"
+echo "✅ Starting server on http://localhost:5001"
 echo ""
 
-python run.py 
+python3 run.py 
