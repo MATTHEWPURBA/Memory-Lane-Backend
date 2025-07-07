@@ -39,8 +39,13 @@ def create_app(config_name=None):
     limiter.init_app(app)
     migrate.init_app(app, db)
     
-    # Initialize CORS
-    CORS(app, origins=app.config['CORS_ORIGINS'])
+    # Initialize CORS with comprehensive configuration
+    CORS(app, 
+         origins=app.config['CORS_ORIGINS'],
+         methods=['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
+         allow_headers=['Content-Type', 'Authorization', 'X-Requested-With'],
+         supports_credentials=True,
+         max_age=3600)
     
     # Initialize SocketIO
     socketio.init_app(
@@ -78,6 +83,8 @@ def create_app(config_name=None):
     # Register error handlers
     from app.utils.error_handlers import register_error_handlers
     register_error_handlers(app)
+    
+
     
     # Register SocketIO events
     from app.events import socketio_events
