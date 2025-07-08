@@ -220,59 +220,71 @@ def sanitize_input(text: str) -> str:
 
 def validate_email_address(email):
     """Validate email format without DNS lookups."""
-    print(f"[DEBUG] validate_email_address called with: {email!r}")
     if not email:
-        print("[DEBUG] Email is empty")
         raise ValidationError("Email is required")
     
     # Clean the email
     email = email.strip().lower()
-    print(f"[DEBUG] Cleaned email: {email!r}")
     
     # More permissive regex for email validation
     email_pattern = r"^[^@\s]+@[^@\s]+\.[^@\s]+$"
-    regex_match = re.match(email_pattern, email)
-    print(f"[DEBUG] Regex match: {regex_match}")
-    if not regex_match:
-        print("[DEBUG] Regex did not match")
+    if not re.match(email_pattern, email):
         raise ValidationError("Invalid email format")
     
     if len(email) > 120:
-        print("[DEBUG] Email too long")
         raise ValidationError("Email is too long (maximum 120 characters)")
     
     # Additional checks for common issues
     if email.startswith('.') or email.endswith('.'):
-        print("[DEBUG] Email starts or ends with period")
         raise ValidationError("Email cannot start or end with a period")
     if '..' in email:
-        print("[DEBUG] Email contains consecutive periods")
         raise ValidationError("Email cannot contain consecutive periods")
     
     local_part, domain = email.split('@', 1)
     if local_part.endswith('.'):
-        print("[DEBUG] Local part ends with period")
         raise ValidationError("Email local part cannot end with a period")
     if len(local_part) < 1:
-        print("[DEBUG] Local part is empty")
         raise ValidationError("Email local part cannot be empty")
     if len(local_part) > 64:
-        print("[DEBUG] Local part too long")
         raise ValidationError("Email local part is too long")
     if len(domain) < 3:
-        print("[DEBUG] Domain too short")
         raise ValidationError("Email domain is too short")
     if len(domain) > 253:
-        print("[DEBUG] Domain too long")
         raise ValidationError("Email domain is too long")
     if '.' not in domain:
-        print("[DEBUG] Domain missing TLD dot")
         raise ValidationError("Email domain must have a valid TLD")
     if domain.startswith('.') or domain.endswith('.'):
-        print("[DEBUG] Domain starts or ends with period")
         raise ValidationError("Email domain cannot start or end with a period")
-    print("[DEBUG] Email validation passed")
+    
     return None  # Return None to indicate success
+
+
+def validate_email_for_check(email):
+    """Validate email format for real-time checking (more lenient)."""
+    if not email:
+        return "Email is required"
+    
+    # Clean the email
+    email = email.strip().lower()
+    
+    # Basic format check for real-time validation
+    if not email or '@' not in email:
+        return "Invalid email format"
+    
+    # Check if email is complete enough for validation
+    if email.endswith('@') or email.endswith('.') or email.count('@') > 1:
+        return "Invalid email format"
+    
+    # Only validate complete emails
+    email_pattern = r"^[^@\s]+@[^@\s]+\.[^@\s]+$"
+    if re.match(email_pattern, email):
+        return None  # Valid complete email
+    
+    # For incomplete emails, just check basic format
+    if len(email) > 120:
+        return "Email is too long (maximum 120 characters)"
+    
+    return None  # Allow incomplete emails during typing
 
 
 def validate_radius(radius):

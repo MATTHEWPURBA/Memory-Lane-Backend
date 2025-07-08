@@ -14,7 +14,7 @@ from sqlalchemy.exc import IntegrityError, SQLAlchemyError
 from app import db, redis_client
 from app.models.user import User
 from app.utils.validators import (
-    validate_username, validate_email_address, validate_password,
+    validate_username, validate_email_address, validate_email_for_check, validate_password,
     ValidationError
 )
 from app.utils.error_handlers import create_error_response, create_success_response
@@ -557,9 +557,9 @@ def check_email():
             current_app.logger.warning("Email check attempt with no email")
             return create_error_response('Missing Email', 'Email is required', 400)
         
-        # Validate email format
+        # Validate email format (more lenient for real-time checking)
         try:
-            email_error = validate_email_address(email)
+            email_error = validate_email_for_check(email)
             if email_error:
                 current_app.logger.debug(f"Email validation error: {email_error}")
                 return create_error_response('Validation Error', email_error, 400)
